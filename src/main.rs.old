@@ -130,6 +130,10 @@ async fn main() {
 async fn baka(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     dbg!(&msg);
     dbg!(args);
+    if let Some(guild) = msg.guild_id {
+        guild.channels()
+    }
     msg.channel_id.say(&ctx.http, "baka survivor").await?;
+    msg.guild_id.unwrap().
     Ok(())
 }
