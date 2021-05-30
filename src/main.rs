@@ -91,7 +91,7 @@ impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Some(data) = &interaction.data {
             match data.name.as_str() {
-                "test" => {
+                "baka" => {
                     let mut baka = Vec::new();
                     gen_baka(5, &mut baka).unwrap();
                     let baka = baka.join(" ");
@@ -115,18 +115,21 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
+        let baka_cmd = json!({
+            "name": "test",
+            "description": "testing baka bot"
+        });
+
         let cmd = ctx
             .http
-            .create_guild_application_command(
-                494671450985201665,
-                &json!({
-                    "name": "test",
-                    "description": "testing baka bot"
-                }),
-            )
+            .create_guild_application_command(494671450985201665, &baka_cmd)
             .await;
 
-        println!("Registered new command: {:?}", cmd);
+        println!("Registered guild command: {:?}", cmd);
+
+        let cmd = ctx.http.create_global_application_command(&baka_cmd).await;
+
+        println!("Registered global command: {:?}", cmd);
 
         let interactions = ApplicationCommand::get_global_application_commands(&ctx.http).await;
 
