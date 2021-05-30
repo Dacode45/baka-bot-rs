@@ -147,6 +147,11 @@ impl EventHandler for Handler {
 async fn main() {
     // Configure the client with your Discord bot token in the environment.
     pretty_env_logger::init();
+    trace!("trace enabled");
+    debug!("debug enabled");
+    info!("info enabled");
+    warn!("warn enabled");
+    error!("error enabled");
     dotenv::dotenv().expect("Failed to read .env file");
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     // The Application Id is usually the Bot User Id.
