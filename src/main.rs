@@ -1,12 +1,13 @@
 #[macro_use]
 extern crate lazy_static;
 
+extern crate pretty_env_logger;
+#[macro_use]
+extern crate log;
+
 use rand::prelude::SliceRandom;
 use serde::Deserialize;
 use serde_json::json;
-use std::collections::HashMap;
-use std::env;
-
 use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
@@ -17,6 +18,8 @@ use serenity::{
     },
     prelude::*,
 };
+use std::collections::HashMap;
+use std::env;
 
 #[derive(Debug, Deserialize)]
 struct WordCount {
@@ -49,25 +52,21 @@ lazy_static! {
         .collect();
 }
 
-fn gen_baka(target: u32, out: &mut Vec<&str>) -> Option<()> {
+fn gen_baka(mut target: u32) -> Vec<&'static str> {
     use rand::Rng;
     let mut rng = rand::thread_rng();
 
-    if target == 0 {
-        return Some(());
-    }
+    let mut out = Vec::new();
 
     loop {
+        if target == 0 {
+            return out;
+        }
         let amt = rng.gen_range(1..=target);
         let words = &COUNT_TO_WORDS[&amt];
         let word = words.choose(&mut rng).unwrap();
         out.push(word);
-        let res = gen_baka(target - amt, out);
-        if res.is_some() {
-            return Some(());
-        } else {
-            out.pop();
-        }
+        target -= amt;
     }
 }
 
@@ -79,10 +78,13 @@ impl Handler {
             .create_interaction_response(&ctx.http, |response| {
                 response
                     .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content("Received event!"))
+                    .interaction_response_data(|message| {
+                        message.content("I don't know what to do about that.")
+                    })
             })
             .await;
-        println!("don't know {:?}: {:?}", interaction, res);
+
+        warn!("unknown command: {:?}: {:?}", interaction, res);
     }
 }
 
@@ -92,18 +94,19 @@ impl EventHandler for Handler {
         if let Some(data) = &interaction.data {
             match data.name.as_str() {
                 "baka" => {
-                    let mut baka = Vec::new();
-                    gen_baka(5, &mut baka).unwrap();
+                    let baka = gen_baka(5);
                     let baka = baka.join(" ");
                     let res = interaction
                         .create_interaction_response(&ctx.http, |response| {
                             response
                                 .kind(InteractionResponseType::ChannelMessageWithSource)
                                 .interaction_response_data(|message| {
-                                    message.content(format!("Baka: {}.", baka))
+                                    message.content(format!("Baka: {}.", &baka))
                                 })
                         })
                         .await;
+                    debug!("result: {:?}", res);
+                    info!("sent baka: '{}'", &baka);
                 }
                 _ => self.dont_know(ctx, interaction).await,
             }
@@ -113,7 +116,7 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is connected!", ready.user.name);
 
         let baka_cmd = json!({
             "name": "test",
@@ -125,15 +128,15 @@ impl EventHandler for Handler {
             .create_guild_application_command(494671450985201665, &baka_cmd)
             .await;
 
-        println!("Registered guild command: {:?}", cmd);
+        info!("Registered guild command: {:?}", cmd);
 
         let cmd = ctx.http.create_global_application_command(&baka_cmd).await;
 
-        println!("Registered global command: {:?}", cmd);
+        info!("Registered global command: {:?}", cmd);
 
         let interactions = ApplicationCommand::get_global_application_commands(&ctx.http).await;
 
-        println!(
+        info!(
             "I have the following global slash command(s): {:?}",
             interactions
         );
@@ -143,9 +146,9 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() {
     // Configure the client with your Discord bot token in the environment.
+    pretty_env_logger::init();
     dotenv::dotenv().expect("Failed to read .env file");
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-
     // The Application Id is usually the Bot User Id.
     let application_id: u64 = env::var("APPLICATION_ID")
         .expect("Expected an application id in the environment")
@@ -164,6 +167,6 @@ async fn main() {
     // Shards will automatically attempt to reconnect, and will perform
     // exponential backoff until it reconnects.
     if let Err(why) = client.start().await {
-        println!("Client error: {:?}", why);
+        error!("Client error: {:?}", why);
     }
 }

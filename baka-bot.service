@@ -10,6 +10,7 @@ Restart=always
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=baka-bot
+Environment=RUST_LOG=debug
 
 [Install]
 WantedBy=multi-user.target
