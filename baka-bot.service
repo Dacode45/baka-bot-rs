@@ -1,0 +1,15 @@
+[Unit]
+Description=Baka Bot
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=/home/davidayeke_gmail_com/rust_stuff/baka-bot-rs
+ExecStart=/home/davidayeke_gmail_com/rust_stuff/baka-bot-rs/baka-bot-rs
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=baka-bot
+
+[Install]
+WantedBy=multi-user.target
