@@ -1,0 +1,4 @@
+/target
+# .vscode
+service-account.json
+.env

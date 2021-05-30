@@ -1,0 +1,135 @@
+use serenity::{
+    async_trait,
+    client::bridge::gateway::{ShardId, ShardManager},
+    framework::standard::{
+        buckets::{LimitedFor, RevertBucket},
+        help_commands,
+        macros::{check, command, group, help, hook},
+        Args, CommandGroup, CommandOptions, CommandResult, DispatchError, HelpOptions, Reason,
+        StandardFramework,
+    },
+    http::Http,
+    model::{
+        channel::{Channel, Message},
+        gateway::Ready,
+        id::UserId,
+        permissions::Permissions,
+    },
+    utils::{content_safe, ContentSafeOptions},
+};
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+    fmt::Write,
+    sync::Arc,
+};
+
+use serenity::prelude::*;
+use tokio::sync::Mutex;
+
+struct Handler;
+
+#[async_trait]
+impl EventHandler for Handler {
+    async fn ready(&self, _: Context, ready: Ready) {
+        println!("{} is connected!", ready.user.name);
+    }
+}
+
+#[group]
+#[description = "AI generated bakas!"]
+#[summary = "BAKA SURVIVORviVORviVOR"]
+#[commands(baka)]
+struct Baka;
+
+#[hook]
+async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
+    println!(
+        "Got command '{}' by user '{}'",
+        command_name, msg.author.name
+    );
+    true
+}
+
+#[hook]
+async fn unknown_command(_ctx: &Context, _msg: &Message, unknown_command_name: &str) {
+    println!("Could not find command named '{}'", unknown_command_name);
+}
+
+#[hook]
+async fn normal_message(_ctx: &Context, msg: &Message) {
+    println!("Message is not a command '{}'", msg.content);
+}
+
+#[hook]
+async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) {
+    println!("Dispatch Error '{:?}'", error);
+
+    if let DispatchError::Ratelimited(info) = error {
+        // We notify them only once.
+        if info.is_first_try {
+            let _ = msg
+                .channel_id
+                .say(
+                    &ctx.http,
+                    &format!("Try this again in {} seconds.", info.as_secs()),
+                )
+                .await;
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    // Configure the client with your Discord bot token in the environment.
+    dotenv::dotenv().expect("Failed to read .env file");
+    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+
+    let http = Http::new_with_token(&token);
+
+    println!("starting");
+
+    // We will fetch your bot's owners and id
+    let (owners, bot_id) = match http.get_current_application_info().await {
+        Ok(info) => {
+            let mut owners = HashSet::new();
+            if let Some(team) = info.team {
+                owners.insert(team.owner_user_id);
+            } else {
+                owners.insert(info.owner.id);
+            }
+            match http.get_current_user().await {
+                Ok(bot_id) => (owners, bot_id.id),
+                Err(why) => panic!("Could not access the bot id: {:?}", why),
+            }
+        }
+        Err(why) => panic!("Could not access application info: {:?}", why),
+    };
+
+    let mut framework = StandardFramework::new()
+        .before(before)
+        .normal_message(normal_message)
+        .unrecognised_command(unknown_command)
+        .on_dispatch_error(dispatch_error)
+        .group(&BAKA_GROUP);
+
+    framework.group_add(&BAKA_GROUP);
+
+    let mut client = Client::builder(&token)
+        .event_handler(Handler)
+        .framework(framework)
+        .await
+        .expect("Err creating client");
+
+    if let Err(why) = client.start().await {
+        println!("Client error: {:?}", why);
+    }
+}
+
+#[command]
+async fn baka(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    dbg!(&msg);
+    dbg!(args);
+    msg.channel_id.say(&ctx.http, "baka survivor").await?;
+    Ok(())
+}
