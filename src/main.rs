@@ -150,7 +150,7 @@ impl EventHandler for Handler {
             .create_interaction_response(&ctx.http, |response| {
                 response
                     .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content("Working on it."))
+                    .interaction_response_data(|message| message.content("Give me a second..."))
             })
             .await;
         match res {
