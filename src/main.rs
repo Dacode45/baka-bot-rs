@@ -15,6 +15,7 @@ use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
     client::bridge::gateway::GatewayIntents,
+    http::CacheHttp,
     model::{
         gateway::Ready,
         interactions::{ApplicationCommand, Interaction, InteractionResponseType},
@@ -122,37 +123,40 @@ impl Handler {
     }
 
     async fn dont_know(&self, ctx: Context, interaction: Interaction) {
-        let res = interaction
-            .create_interaction_response(&ctx.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| {
-                        message.content("I don't know what to do about that.")
-                    })
-            })
-            .await;
-
-        warn!("unknown command: {:?}: {:?}", interaction, res);
+        warn!("unknown command: {:?}", interaction);
+        if let Some(channel) = interaction.channel_id {
+            let _ = channel
+                .say(&ctx.http, format!("I don't know what to do about that."))
+                .await;
+        }
     }
     async fn error(&self, ctx: Context, interaction: Interaction, err: String) {
-        error!("{}", &err);
-        let res = interaction
-            .create_interaction_response(&ctx.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| {
-                        message.content(&format!("I did my best, but something went wrong...Baka!"))
-                    })
-            })
-            .await;
-
-        warn!("unknown command: {:?}: {:?}", interaction, res);
+        error!("error {}", &err);
+        if let Some(channel) = interaction.channel_id {
+            let _ = channel
+                .say(
+                    &ctx.http,
+                    format!("I did my best, but something went wrong...Baka!"),
+                )
+                .await;
+        }
     }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        let res = interaction
+            .create_interaction_response(&ctx.http, |response| {
+                response
+                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|message| message.content("Working on it."))
+            })
+            .await;
+        match res {
+            Err(e) => return self.error(ctx, interaction, format!("{}", e)).await,
+            _ => {}
+        }
         if let Some(data) = &interaction.data {
             match data.name.as_str() {
                 "baka" => {
@@ -162,17 +166,11 @@ impl EventHandler for Handler {
                             let bakas: Vec<_> =
                                 bakas.iter().map(|p| format!("Baka: {}.", p)).collect();
                             let bakas = bakas.join("\n");
-                            let res = interaction
-                                .create_interaction_response(&ctx.http, |response| {
-                                    response
-                                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                                        .interaction_response_data(|message| {
-                                            message.content(&bakas)
-                                        })
-                                })
-                                .await;
-                            debug!("result: {:?}", res);
-                            info!("sent baka: '{}'", &bakas);
+                            if let Some(channel) = interaction.channel_id {
+                                let res = channel.say(&ctx.http, &bakas).await;
+                                debug!("result: {:?}", res);
+                                info!("sent baka: '{}'", &bakas);
+                            }
                         }
                         Err(e) => self.error(ctx, interaction, format!("{}", e)).await,
                     }
